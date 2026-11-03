@@ -27,6 +27,13 @@ for (const [name, renderer] of [['dashboard', 'dashboard'], ['forecast', 'scenar
  assert(!html.includes('NaN') && !html.includes('undefined'), `${name} renders invalid values`);
  assert(html.length > 200);
 }
+const dashboardHTML = run('dashboard()');
+assert(dashboardHTML.includes('class="page-heading dashboard-hero"'));
+assert.equal((dashboardHTML.match(/class="planning-step"/g) || []).length, 3);
+assert(dashboardHTML.includes('۱۲۰ ردیف نمایشی'));
+for (const target of ['import', 'forecast', 'scenario']) {
+ assert(dashboardHTML.includes(`href="#${target}"`));
+}
 assert.equal(run("shift('1405-12', 1)"), '1406-01');
 assert.equal(run("shift('1405-01', -1)"), '1404-12');
 assert.equal(run("esc('<script>')"), '&lt;script&gt;');
