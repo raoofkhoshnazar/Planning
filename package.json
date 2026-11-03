@@ -1,0 +1,12 @@
+{
+  "name": "plannama-commercial-planning",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Monthly Commercial planning and analytical forecasting",
+  "scripts": {
+    "start": "python3 server.py",
+    "dev": "python3 server.py",
+    "test": "python3 -m unittest discover -s . -p 'test_*.py' -v && node test_frontend.cjs",
+    "check": "node --check app.js && python3 -m py_compile planning.py server.py"
+  }
+}
