@@ -6,7 +6,8 @@
   "scripts": {
     "start": "python3 server.py",
     "dev": "python3 server.py",
-    "test": "python3 -m unittest discover -s . -p 'test_*.py' -v && node test_frontend.cjs",
-    "check": "node --check app.js && python3 -m py_compile planning.py server.py"
+    "build:pages": "python3 build_pages.py",
+    "test": "python3 build_pages.py && python3 -m unittest discover -s . -p 'test_*.py' -v && node test_frontend.cjs && node test_pages.cjs",
+    "check": "node --check app.js && node --check local-engine.js && python3 -m py_compile planning.py server.py build_pages.py"
   }
 }
