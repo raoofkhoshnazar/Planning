@@ -54,6 +54,48 @@ print(json.dumps([forecast(d['performance'],d['cohort'],'1405-08',a) for a in [{
  await assert.rejects(api('/api/import',{...payload,rows:[{...row,vertical:'QUOTA'}]}),/ذخیره/);
  quota = false;
  assert.equal((await api('/api/state?demo=0')).performance.length,1);
+ storage.clear();
+ const bundle = JSON.parse(execFileSync('python3',['-c','import json; from test_bundle import fixture; print(json.dumps(fixture()))'],{encoding:'utf8'}));
+ bundle.files.cohort.rows.push({...bundle.files.cohort.rows[0],cohort_age:-1,cohort_month:'2026-11-01'});
+ const checked = await api('/api/import/bundle/validate',bundle);
+ assert.equal(checked.target,'2026-11'); assert.equal(checked.calendar,'gregorian'); assert.equal(checked.rejected.length,1);
+ assert.equal(checked.files.find(f=>f.kind==='cohort').count,1);
+ assert.equal((await api('/api/state?demo=0')).performance.length,0);
+ await assert.rejects(api('/api/import/bundle',bundle));
+ const future=JSON.parse(JSON.stringify(bundle)); future.files.voucher.rows[0].month='2026-11-01';
+ await assert.rejects(api('/api/import/bundle/validate',future),/نشت/);
+ const incomplete=JSON.parse(JSON.stringify(bundle));delete incomplete.files.organic;
+ await assert.rejects(api('/api/import/bundle/validate',incomplete));
+ quota=true; await assert.rejects(api('/api/import/bundle',{...bundle,confirmed_warnings:true}));quota=false;
+ state=await api('/api/state?demo=0'); assert(['performance','cohort','organic','voucher'].every(k=>state[k].length===0));
+ await api('/api/import/bundle',{...bundle,confirmed_warnings:true});
+ state=await api('/api/state?demo=0');assert.equal(state.runs.length,4);assert.equal(state.training_bundle.rejected.length,1);
+ assert.equal(state.organic[0].non_organic_aov_toman,null);
+ assert.equal((await api('/api/forecast',{target:'2026-11',assumptions:{}})).rows.length,1);
+ await assert.rejects(api('/api/import/bundle',{...bundle,confirmed_warnings:true}),/تکراری/);
+ if(process.env.TEST_UPLOADED_TRAINING==='1') {
+  storage.clear();
+  const actual=JSON.parse(execFileSync('python3',['-c',`import csv,glob,json
+from planning import TABLES,forecast
+from bundle_import import prepare_bundle
+files={}
+for path in glob.glob('uploads/*.csv'):
+ rows=list(csv.DictReader(open(path,encoding='utf-8-sig')))
+ h=rows[0]
+ kind='performance' if 'M.month' in h else 'cohort' if 'cohort_month' in h else 'organic' if 'organic_orders' in h else 'voucher'
+ files[kind]={'rows':rows,'source':path.split('/')[-1]}
+r=prepare_bundle({'files':files},{k:[] for k in TABLES})
+ds={f['kind']:f['rows'] for f in r['files']}
+f=forecast(ds['performance'],ds['cohort'],r['target'],{},r)
+print(json.dumps({'payload':{'files':files},'summary':{'target':r['target'],'warnings':len(r['warnings']),'quarantined':len(r['rejected'])},'forecast':f}))`],{encoding:'utf8'}));
+  const preview=await api('/api/import/bundle/validate',actual.payload);
+  assert.equal(preview.target,actual.summary.target);assert.equal(preview.warnings.length,actual.summary.warnings);assert.equal(preview.rejected.length,actual.summary.quarantined);
+  await api('/api/import/bundle',{...actual.payload,confirmed_warnings:true});
+  const predicted=await api('/api/forecast',{target:preview.target,assumptions:{}});
+  for(const rows of [predicted.rows,actual.forecast.rows])for(const r of rows)delete r.source_run_ids;
+  close(predicted,actual.forecast);
+  console.log(`Uploaded CSVs verified: ${preview.files.map(f=>f.count).join('/')} accepted rows, ${preview.rejected.length} quarantined, target ${preview.target}, ${predicted.rows.length} forecast segments.`);
+ }
  const html = fs.readFileSync('docs/index.html','utf8');
  assert(html.includes('src="./local-engine.js"'));
  assert(!/(?:src|href)="\/(?:app.js|styles.css)/.test(html));

@@ -21,7 +21,9 @@ class PlanningTests(unittest.TestCase):
         self.assertEqual(p.period('۱۴۰۵/۰۷'), '1405-07')
         self.assertEqual(p.shift('1405-12', 1), '1406-01')
         self.assertEqual(p.shift('1405-01', -1), '1404-12')
-        for bad in ['1405-13', '2026-11', '1405-00', 'nonsense']:
+        self.assertEqual(p.period('2026-11'), '2026-11')
+        self.assertEqual(p.shift('2026-12', 1), '2027-01')
+        for bad in ['1405-13', '1800-11', '1405-00', 'nonsense']:
             with self.assertRaises(ValueError):
                 p.period(bad)
 
@@ -56,14 +58,15 @@ class PlanningTests(unittest.TestCase):
             p.validate('performance', [self.row])
 
     def test_explicit_calendar_mapping(self):
-        row = {**self.row, 'month': '2026-10-01'}
+        row = {**self.row, 'M.month': '2026-10-01'}
         del row['persian_year_month']
-        with self.assertRaises(ValueError):
-            p.validate('performance', [row])
         normalized, _ = p.validate('performance', [row], '1405-07')
-        self.assertEqual(normalized[0]['persian_year_month'], '1405-07')
+        self.assertEqual(normalized[0]['persian_year_month'], '2026-10')
+        self.assertEqual(normalized[0]['calendar_basis'], 'gregorian')
+        normalized, _ = p.validate('performance', [row, {**row, 'M.month': '2026-09-01'}])
+        self.assertEqual(len(normalized), 2)
         with self.assertRaises(ValueError):
-            p.validate('performance', [row, {**row, 'month': '2026-09-01'}], '1405-07')
+            p.validate('performance', [{**row, 'M.month': '2026-09-15'}])
 
     def test_cohort_age(self):
         row = {**self.demo['cohort'][-1], 'cohort_age': 99}

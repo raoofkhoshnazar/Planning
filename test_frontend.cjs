@@ -27,6 +27,11 @@ for (const [name, renderer] of [['dashboard', 'dashboard'], ['forecast', 'scenar
  assert(!html.includes('NaN') && !html.includes('undefined'), `${name} renders invalid values`);
  assert(html.length > 200);
 }
+const importHTML = run('importPage()');
+assert.equal((importHTML.match(/data-bundle-kind=/g)||[]).length,4);
+assert(importHTML.includes('ثبت فایل‌ها و شروع پلنینگ'));
+assert.equal(run("monthName('2026-11')"),'نوامبر ۲۰۲۶');
+assert.equal(run("shortMonth('2026-10')"),'اکتبر');
 const dashboardHTML = run('dashboard()');
 assert(dashboardHTML.includes('class="page-heading dashboard-hero"'));
 assert.equal((dashboardHTML.match(/class="planning-step"/g) || []).length, 3);

@@ -8,6 +8,7 @@ import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
+from bundle_import import prepare_bundle
 from planning import TABLES, assumptions, demo_data, forecast, period, validate
 
 ROOT = Path(__file__).resolve().parent
@@ -20,6 +21,7 @@ def connect():
     conn.row_factory = sqlite3.Row
     conn.execute('PRAGMA foreign_keys=ON')
     conn.executescript('''
+    CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, payload TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS runs(id TEXT PRIMARY KEY, loaded_at TEXT NOT NULL, kind TEXT NOT NULL, count INTEGER NOT NULL, warnings TEXT NOT NULL, source TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS actuals(kind TEXT NOT NULL, row_key TEXT NOT NULL, run_id TEXT NOT NULL REFERENCES runs(id), payload TEXT NOT NULL, PRIMARY KEY(kind,row_key));
     CREATE TRIGGER IF NOT EXISTS immutable_actual_update BEFORE UPDATE ON actuals BEGIN SELECT RAISE(ABORT,'Actual data is immutable'); END;
@@ -37,6 +39,9 @@ def dataset(conn, demo=False):
     data = {kind: [] for kind in TABLES}
     for row in conn.execute('SELECT kind,payload FROM actuals ORDER BY row_key'):
         data[row['kind']].append(json.loads(row['payload']))
+    setting = conn.execute("SELECT payload FROM settings WHERE key='training_bundle'").fetchone()
+    if setting:
+        data['training_bundle'] = json.loads(setting['payload'])
     return data
 
 
@@ -92,7 +97,27 @@ class Handler(BaseHTTPRequestHandler):
                 raise ValueError('ساختار درخواست معتبر نیست.')
             path = urlparse(self.path).path
             with connect() as conn:
-                if path in ['/api/import/validate', '/api/import']:
+                if path in ['/api/import/bundle/validate', '/api/import/bundle']:
+                    result = prepare_bundle(data, dataset(conn))
+                    summary = {**result, 'files': [{k: v for k, v in file.items() if k != 'rows'} for file in result['files']]}
+                    if path.endswith('validate'):
+                        self.send(200, summary)
+                        return
+                    if result['warnings'] and data.get('confirmed_warnings') is not True:
+                        raise ValueError('هشدارهای کیفیت را پیش از شروع پلنینگ تأیید کنید.')
+                    now = dt.datetime.now(dt.timezone.utc).isoformat()
+                    for file in result['files']:
+                        run = uuid.uuid4().hex[:12]
+                        conn.execute('INSERT INTO runs VALUES(?,?,?,?,?,?)', (run, now, file['kind'], file['count'], json.dumps(result['warnings'], ensure_ascii=False), file['source']))
+                        for r in file['rows']:
+                            row_key = r.pop('_key')
+                            r.update(source_run_id=run, loaded_at=now)
+                            conn.execute('INSERT INTO actuals VALUES(?,?,?,?)', (file['kind'], row_key, run, json.dumps(r, ensure_ascii=False)))
+                    setting = dict(target=result['target'], calendar=result['calendar'], warnings=result['warnings'], rejected=result['rejected'], loaded_at=now)
+                    conn.execute("INSERT INTO settings VALUES('training_bundle',?) ON CONFLICT(key) DO UPDATE SET payload=excluded.payload", (json.dumps(setting, ensure_ascii=False),))
+                    conn.commit()
+                    self.send(200, summary)
+                elif path in ['/api/import/validate', '/api/import']:
                     kind = data.get('kind')
                     rows, warnings = validate(kind, data.get('rows'), data.get('period'))
                     existing = {r['row_key'] for r in conn.execute('SELECT row_key FROM actuals WHERE kind=?', (kind,))}
@@ -132,7 +157,7 @@ class Handler(BaseHTTPRequestHandler):
                 elif path in ['/api/forecast', '/api/scenarios']:
                     ds = dataset(conn, data.get('demo') is True)
                     a = assumptions(data.get('assumptions', {}))
-                    result = forecast(ds['performance'], ds['cohort'], data.get('target', ''), a)
+                    result = forecast(ds['performance'], ds['cohort'], data.get('target', ''), a, ds.get('training_bundle'))
                     if path == '/api/scenarios':
                         name = str(data.get('name', '')).strip()[:120]
                         if not name:

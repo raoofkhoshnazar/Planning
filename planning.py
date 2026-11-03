@@ -17,8 +17,8 @@ def period(value):
     if len(parts) != 2 or not all(p.isdigit() for p in parts):
         raise ValueError('ماه شمسی باید به شکل 1405-07 باشد.')
     y, m = map(int, parts)
-    if not 1300 <= y <= 1600 or not 1 <= m <= 12:
-        raise ValueError('ماه یا سال شمسی معتبر نیست.')
+    if not (1300 <= y <= 1600 or 1900 <= y <= 2200) or not 1 <= m <= 12:
+        raise ValueError('ماه یا سال شمسی/میلادی معتبر نیست.')
     return f'{y:04d}-{m:02d}'
 
 
@@ -47,16 +47,32 @@ def validate(kind, rows, selected_period=None):
         if not isinstance(original, dict):
             raise ValueError(f'ردیف {index}: ساختار معتبر نیست.')
         r = dict(original)
+        source_month = r.get('M.month', r.get('month', r.get('month_key', r.get('activity_month'))))
+        def from_date(value):
+            import datetime
+            parsed = datetime.date.fromisoformat(str(value))
+            if parsed.day != 1:
+                raise ValueError(f'ردیف {index}: تاریخ ماه باید روز اول باشد.')
+            return period(parsed.strftime('%Y-%m'))
+        if not r.get('persian_year_month') and source_month:
+            r['persian_year_month'] = from_date(source_month)
+        if kind == 'cohort' and not r.get('cohort_persian_month') and r.get('cohort_month'):
+            r['cohort_persian_month'] = from_date(r['cohort_month'])
         if not r.get('persian_year_month'):
             if not selected_period or len(source_months) > 1:
                 raise ValueError('برای فایل چندماهه ستون persian_year_month الزامی است؛ برای فایل تک‌ماهه ماه شمسی را انتخاب کنید.')
             r['persian_year_month'] = selected_period
         r['persian_year_month'] = period(r['persian_year_month'])
+        r['calendar_basis'] = 'gregorian' if int(r['persian_year_month'][:4]) >= 1900 else 'persian'
         for field in ['vertical'] + ([] if kind == 'voucher' else ['payment_method']):
             if not isinstance(r.get(field), str) or not r[field].strip() or len(r[field]) > 100:
                 raise ValueError(f'ردیف {index}: ستون {field} الزامی است.')
             r[field] = r[field].strip()
         for field in TABLES[kind]:
+            denominator = r.get('organic_orders') if field == 'organic_aov_toman' else r.get('non_organic_orders') if field == 'non_organic_aov_toman' else None
+            if field.endswith('aov_toman') and r.get(field) in (None, '') and denominator == 0:
+                r[field] = None
+                continue
             try:
                 number = float(str(r[field]).translate(DIGITS).replace(',', '').replace('٬', ''))
             except (ValueError, KeyError, TypeError):
@@ -94,6 +110,8 @@ def validate(kind, rows, selected_period=None):
         if r.get('payment_method') == 'Unknown':
             warnings.append(f'ردیف {index}: روش پرداخت ناشناخته است.')
         normalized.append(r)
+    if len({r['calendar_basis'] for r in normalized}) != 1:
+        raise ValueError('تقویم ردیف‌های فایل باید یکسان باشد.')
     return normalized, warnings
 
 
@@ -117,13 +135,21 @@ def assumptions(data):
     return out
 
 
-def forecast(performance, cohorts, target, raw_assumptions):
+def forecast(performance, cohorts, target, raw_assumptions, training_bundle=None):
     target = period(target)
     a = assumptions(raw_assumptions)
     history = [r for r in performance if r['persian_year_month'] < target]
     if not history:
         raise ValueError('پیش از ماه هدف، دادهٔ واقعی وجود ندارد.')
     groups = sorted({(r['vertical'], r['payment_method']) for r in history})
+    skipped = 0
+    if training_bundle:
+        required = [shift(target, -1)] if a['baseline'] == 'previous' else [shift(target, -12)] if a['baseline'] == 'year' else [shift(target, -i) for i in range(1, 4)]
+        eligible = [(v, p) for v, p in groups if all(any(r['vertical'] == v and r['payment_method'] == p and r['persian_year_month'] == m for r in history) for m in required)]
+        skipped = len(groups) - len(eligible)
+        if not eligible:
+            raise ValueError('هیچ سگمنتی دادهٔ کامل مبنای انتخاب‌شده را ندارد.')
+        groups = eligible
     results = []
     for vertical, payment in groups:
         series = sorted([r for r in history if (r['vertical'], r['payment_method']) == (vertical, payment)], key=lambda r: r['persian_year_month'])
@@ -179,7 +205,10 @@ def forecast(performance, cohorts, target, raw_assumptions):
         cost = a['voucher_cost'] or ratio(avg('total_voucher_toman'), avg('voucher_orders')) or 0
         results.append({'persian_year_month': target, 'vertical': vertical, 'payment_method': payment, 'new_users': new, 'active_users': active, 'orders': orders, 'aov_toman': aov, 'gross_gmv_toman': orders * aov, 'voucher_orders': vorders, 'non_voucher_orders': orders - vorders, 'total_voucher_toman': vorders * cost, 'method': method, 'retention_interpolated_or_extended': extrapolated, 'baseline_months': months, 'source_run_ids': sorted({r.get('source_run_id', 'demo') for r in base}), 'trend_pct': growth * 100})
     cost = sum(r['total_voucher_toman'] for r in results)
-    return {'target': target, 'rows': results, 'assumptions': a, 'voucher_cost': cost, 'budget': a['budget'], 'over_budget': cost > a['budget'], 'budget_remaining': a['budget'] - cost, 'warnings': ['کاربران تجمیعی جمع سگمنت‌ها هستند؛ تعداد کاربران یکتای کل نیستند.', 'پیش‌بینی تحلیلی است، نه تضمین عملکرد یا برنامهٔ مالی قطعی.'] + (['کوهورت کامل برای سن‌های هدف موجود نیست؛ در سگمنت‌های علامت‌دار از تقریب کاربران قدیمی استفاده شد.'] if any(r['method'] == 'aggregate' for r in results) else []) + (['برای سن‌های فاقد مشاهده، منحنی نگهداشت بین سن‌های موجود خطی و پس از آخرین سن، ثابت امتداد یافته است؛ کوهورت‌های بدون سن صفر در مدل وارد نمی‌شوند.'] if any(r['retention_interpolated_or_extended'] for r in results) else [])}
+    extra = ([f'{skipped} سگمنت فاقد مبنای کامل از پیش‌بینی کنار گذاشته شد؛ برای آن‌ها عدد ساختگی تولید نشده است.'] if skipped else [])
+    if training_bundle and training_bundle.get('warnings'):
+        extra.append(f"مجموعهٔ ورودی {len(training_bundle['warnings'])} هشدار کیفیت تأییدشده دارد؛ خروجی صرفاً تحلیلی است.")
+    return {'target': target, 'rows': results, 'assumptions': a, 'voucher_cost': cost, 'budget': a['budget'], 'over_budget': cost > a['budget'], 'budget_remaining': a['budget'] - cost, 'warnings': ['کاربران تجمیعی جمع سگمنت‌ها هستند؛ تعداد کاربران یکتای کل نیستند.', 'پیش‌بینی تحلیلی است، نه تضمین عملکرد یا برنامهٔ مالی قطعی.'] + (['کوهورت کامل برای سن‌های هدف موجود نیست؛ در سگمنت‌های علامت‌دار از تقریب کاربران قدیمی استفاده شد.'] if any(r['method'] == 'aggregate' for r in results) else []) + (['برای سن‌های فاقد مشاهده، منحنی نگهداشت بین سن‌های موجود خطی و پس از آخرین سن، ثابت امتداد یافته است؛ کوهورت‌های بدون سن صفر در مدل وارد نمی‌شوند.'] if any(r['retention_interpolated_or_extended'] for r in results) else []) + extra}
 
 
 def demo_data():
