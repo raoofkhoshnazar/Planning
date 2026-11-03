@@ -9,12 +9,13 @@ const node = selector => {
  return nodes.get(selector);
 };
 const context = vm.createContext({
- console, Intl, URL, Blob, setTimeout, clearTimeout,
+ console, Intl, URL, Blob, TextEncoder, setTimeout, clearTimeout,
  document: { querySelector: node, querySelectorAll: () => [], addEventListener() {}, body: { style: {} } },
  localStorage: { getItem: () => null, setItem() {} },
  location: { hash: '#dashboard' }, window: { addEventListener() {}, scrollTo() {} },
 });
 const source = fs.readFileSync('app.js', 'utf8').replace(/load\(\);\s*$/, '');
+vm.runInContext(fs.readFileSync('forecast-reports.js','utf8'),context);
 vm.runInContext(source, context);
 const run = code => vm.runInContext(code, context);
 const fixture = JSON.parse(execFileSync('python3', ['-c', 'import json; from planning import demo_data; print(json.dumps(demo_data()))'], { encoding: 'utf8' }));
@@ -52,6 +53,19 @@ assert.throws(() => run("parseCSV('a,b\\n1')"));
 assert.throws(() => run("parseCSV('a,b\\n\"unclosed,2')"));
 assert(run("csv([{name:'=HYPERLINK(\"test\")'}])").includes("'=HYPERLINK"));
 assert(run("csv([{name:'@SUM(A1)'}])").includes("'@SUM"));
+run("lastForecast = {target:'2026-11',rows:[{vertical:'FASHION',orders:31,gross_gmv_toman:3100.01}],warnings:[]}; reportTab='monthly';");
+const monthlyHTML=run('forecastReportHTML()');
+assert(monthlyHTML.includes('data-report-tab="monthly" aria-selected="true"'));
+assert(monthlyHTML.includes('اکسل کامل دوشیتی'));
+assert(monthlyHTML.includes('NMV (Prediction)'));
+assert(monthlyHTML.includes('GMV (Prediction, Toman)'));
+assert(!monthlyHTML.includes('NaN')&&!monthlyHTML.includes('undefined'));
+run("reportTab='daily';");
+const dailyHTML=run('forecastReportHTML()');
+assert(dailyHTML.includes('data-report-tab="daily" aria-selected="true"'));
+assert(dailyHTML.includes('2026-11-30'));
+assert(dailyHTML.includes('توزیع یکنواخت'));
+run("lastForecast=null;");
 run("data.performance = []; data.cohort = []; data.voucher = []; data.organic = []; demo = false; selectedMonth = ''; ");
 for (const renderer of ['dashboard', 'scenarioPage', 'cohortPage', 'voucherPage', 'deviationPage', 'importPage', 'reportsPage']) {
  const html = run(`${renderer}()`);

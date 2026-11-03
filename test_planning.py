@@ -157,7 +157,7 @@ class APITests(unittest.TestCase):
             return error.code, json.loads(error.read())
 
     def test_01_static_and_demo_state(self):
-        for path in ['/', '/app.js', '/styles.css']:
+        for path in ['/', '/app.js', '/styles.css', '/forecast-reports.js']:
             with urlopen(self.base + path) as response:
                 self.assertEqual(response.status, 200)
                 self.assertGreater(len(response.read()), 100)
