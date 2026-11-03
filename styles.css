@@ -191,6 +191,25 @@ footer { color: #788d78; }
   .panel h2 { font-size: 12px; }
   .sidebar { box-shadow: -10px 0 50px #102c2530; }
 }
+.bundle-panel { margin-bottom: 24px; border-color: #cadbc2; background: linear-gradient(145deg, #fff, #f8fbf5); }
+.bundle-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; padding: 24px 22px 18px; }
+.bundle-slot { display: flex; flex-direction: column; min-width: 0; padding: 18px 15px; border: 1.5px dashed #bfceba; border-radius: 12px; background: #fff; cursor: pointer; position: relative; transition: border-color .18s, background .18s; }
+.bundle-slot:hover, .bundle-slot.dragover, .bundle-slot:focus-within { border-color: #548749; background: #f0f7e9; }
+.bundle-slot.has-file { border-style: solid; border-color: #89ac78; background: #f2f8eb; }
+.bundle-slot-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+.bundle-slot-top svg { width: 24px; height: 24px; color: #729a64; }
+.bundle-slot strong { font-size: 12px; color: #3e603c; margin-bottom: 9px; }
+.bundle-slot-hint { color: #7a8f70; font-size: 9px; line-height: 1.9; min-height: 36px; }
+.bundle-filename { color: #41683e; font-size: 10px; line-height: 1.8; margin-top: 18px; overflow-wrap: anywhere; max-height: 55px; overflow: auto; }
+.bundle-file-meta { color: #8b9e7f; font-size: 9px; margin-top: 6px; }
+.bundle-notice { margin: 0 22px 18px; color: #74896b; font-size: 10px; line-height: 2.1; }
+.bundle-notice code { display: inline-block; direction: ltr; background: #eef4e7; padding: 0 5px; border-radius: 4px; }
+.bundle-warnings { margin: 15px 0; border: 1px solid #eadcb9; background: #fffaf0; border-radius: 8px; padding: 13px; color: #947439; font-size: 11px; }
+.bundle-warnings summary { cursor: pointer; }
+.bundle-warnings ul { max-height: 230px; overflow: auto; font-size: 10px; }
+.bundle-panel .field-check { line-height: 2; }
+@media (max-width: 1100px) { .bundle-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 620px) { .bundle-grid { gap: 10px; padding: 18px 14px; } .bundle-slot { padding: 14px 11px; } .bundle-slot strong { font-size: 11px; } .bundle-slot-hint { font-size: 8px; } .bundle-filename { font-size: 9px; } .bundle-notice { margin: 0 15px 18px; } .bundle-panel .form-actions .btn { flex-basis: 100%; } }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; scroll-behavior: auto !important; }
   .planning-step:hover { transform: none; }
