@@ -88,6 +88,11 @@ for (const renderer of ['dashboard', 'scenarioPage', 'cohortPage', 'voucherPage'
  context.planningLocalAPI=async()=>({local:true});
  context.fetch=()=>{throw Error('Static deployment must not request a Python API');};
  assert.equal((await run("api('/api/state')")).local,true);
+ let aggregateRendered=false;
+ context.AggregatePlanning={render:()=>{aggregateRendered=true;}};
+ await run('load()');
+ assert(aggregateRendered,'new aggregate workflow must start without contacting the legacy backend');
+ assert(nodes.get('#navigation').innerHTML.includes('پلنینگ میلادی'));
  console.log('API response checks passed: empty, HTML, truncated JSON, invalid structure, backend errors and static local routing.');
 })().catch(error=>{console.error(error);process.exitCode=1;});
 console.log('Frontend checks passed: all 8 pages, empty states, Persian periods, CSV parsing, HTML escaping and safe exports.');

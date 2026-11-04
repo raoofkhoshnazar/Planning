@@ -13,7 +13,7 @@ html = html.replace('<script type="module" src="/app.js"></script>', '<script sr
 html = html.replace('ذخیره‌سازی محلی', 'ذخیره در همین مرورگر')
 html = html.replace('نسخهٔ تحلیلی · فضای محلی', 'نسخهٔ مرورگری · GitHub Pages')
 (output / 'index.html').write_text(html)
-for name in ['app.js', 'styles.css', 'local-engine.js', 'forecast-reports.js']:
+for name in ['app.js', 'styles.css', 'local-engine.js', 'forecast-reports.js', 'planning-v2.js', 'extraction-contract.json']:
     shutil.copyfile(root / name, output / name)
 (output / 'demo-data.json').write_text(json.dumps(demo_data(), ensure_ascii=False, separators=(',', ':')))
 (output / '.nojekyll').touch()

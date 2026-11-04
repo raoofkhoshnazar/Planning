@@ -7,7 +7,7 @@
     "start": "python3 server.py",
     "dev": "python3 server.py",
     "build:pages": "python3 build_pages.py",
-    "test": "python3 build_pages.py && python3 -m unittest discover -s . -p 'test_*.py' -v && node test_frontend.cjs && node test_pages.cjs && node test_reports.cjs",
-    "check": "node --check app.js && node --check local-engine.js && node --check forecast-reports.js && python3 -m py_compile planning.py server.py build_pages.py"
+    "test": "python3 build_pages.py && python3 -m unittest discover -s . -p 'test_*.py' -v && node test_frontend.cjs && node test_pages.cjs && node test_reports.cjs && node test_v2.cjs",
+    "check": "node --check app.js && node --check local-engine.js && node --check forecast-reports.js && node --check planning-v2.js && python3 -m py_compile planning.py server.py build_pages.py"
   }
 }

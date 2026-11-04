@@ -69,7 +69,7 @@ class Handler(BaseHTTPRequestHandler):
                 data['scenarios'] = [{**dict(r), 'payload': json.loads(r['payload']), 'result': json.loads(r['result'])} for r in conn.execute('SELECT * FROM scenarios WHERE mode=? ORDER BY created_at DESC', (mode,))]
             self.send(200, data)
             return
-        files = {'/': 'index.html', '/index.html': 'index.html', '/app.js': 'app.js', '/styles.css': 'styles.css', '/forecast-reports.js': 'forecast-reports.js'}
+        files = {'/': 'index.html', '/index.html': 'index.html', '/app.js': 'app.js', '/styles.css': 'styles.css', '/forecast-reports.js': 'forecast-reports.js', '/planning-v2.js': 'planning-v2.js', '/extraction-contract.json': 'extraction-contract.json'}
         if path not in files:
             self.send(404, {'error': 'یافت نشد.'})
             return

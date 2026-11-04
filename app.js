@@ -71,6 +71,10 @@ $('#modal').onclick = e => { if (e.target.id === 'modal') closeModal(); };
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); $('#sidebar').classList.remove('open'); } if (e.key === 'Tab' && !$('#modal').hidden) { const nodes = $$('button,a,input,select,textarea', $('#modal')).filter(n => !n.disabled); const first = nodes[0], last = nodes.at(-1); if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); } else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); } } });
 $('#menu-toggle').onclick = () => $('#sidebar').classList.toggle('open');
 function guide() {
+ if (globalThis.AggregatePlanning) {
+  openModal('<h2>پلنینگ میلادی با کوهورت‌های تجمیعی</h2><p>قرارداد و هشت کوئری را از ابتدای صفحه دریافت کنید؛ پس از اجرای داخلی و تأیید تیم داده، فایل‌های تجمیعی را بارگذاری کنید. نسخهٔ جدید دادهٔ فردی، شناسه یا فایل‌های چهارگانهٔ قدیمی را به‌جای قرارداد جدید نمی‌پذیرد.</p><p>چند سکتور، ورتیکال، روش پرداخت و ماه هدف تا پایان ۲۰۲۷ انتخاب کنید. برنامه ماه‌های میانی را بازگشتی می‌سازد و تحلیل شش ماه اخیر همان فیلترها را اعمال می‌کند. همهٔ تاریخ‌ها میلادی‌اند؛ دادهٔ غایب یا سرکوب‌شده صفر نیست.</p><p>فقط دادهٔ بسته پیش از نقطهٔ برش استفاده می‌شود. مدل‌های مرجع تجمیعی با ارزیابی یک‌گام کوهورت‌های موجود مقایسه می‌شوند؛ این معیار تضمین خطای چندماهه یا اثر علّی ووچر نیست. هزینهٔ مصرفی جای بودجهٔ مصوب نیست.</p><p>داده فقط در همین مرورگر نگهداری می‌شود؛ خروجی JSON کامل برنامه و اصل فایل‌ها را حفظ کنید. کاربران فقط در هر سکتور یکتا هستند؛ بین سکتورها، ورتیکال‌ها و پرداخت‌ها جمع یکتای کل نداریم.</p>');
+  return;
+ }
  if (globalThis.planningLocalAPI) {
   openModal(`<h2>پلن‌نما روی GitHub Pages</h2><p>این نسخه بدون سرور اجرا می‌شود. ورود CSV/JSON، پیش‌بینی، سناریوها و گزارش‌ها روی همین مرورگر پردازش می‌شوند؛ اطلاعات واردشده به گیت‌هاب ارسال نمی‌شود.</p><h3>نگهداری اطلاعات</h3><p>داده‌ها فقط در همین مرورگر و همین دستگاه ذخیره می‌شوند و بین کاربران همگام نیستند. پاک‌کردن داده‌های سایت، حالت ناشناس یا تغییر دستگاه می‌تواند دسترسی به آن‌ها را از بین ببرد؛ پس از هر بار ورود، از گزارش‌ها و سناریوها خروجی بگیرید.</p><h3>قفل و تأیید</h3><p>قفل فقط در رابط همین مرورگر اعمال می‌شود و محافظت ممیزیِ سروری یا تأیید مالی مبتنی بر نقش نیست؛ کاربر دستگاه می‌تواند ذخیره‌سازی مرورگر را تغییر دهد.</p><h3>مبنای ماه و پیش‌بینی</h3><p>کوئری پیوست ماه میلادی تولید می‌کند؛ فایل‌های آموزشی مستقیماً با همین تقویم و مرز ماه وارد می‌شوند، نه با برچسب شمسیِ ساختگی. برای تحلیل شمسی واقعی، خروجی جداگانه با مرز ماه شمسی لازم است. ستون‌های _toman از قبل تومان‌اند. نتیجهٔ پیش‌بینی تحلیلی است، نه تضمین عملکرد.</p>`);
   return;
@@ -245,6 +249,11 @@ function reportsPage() {
 }
 function navigate(target) { location.hash = target; if (page === target) render(); }
 function render() {
+ if (globalThis.AggregatePlanning) {
+  $('#breadcrumb-title').textContent='پلنینگ میلادی و تحلیل شش‌ماهه';
+  $('#navigation').innerHTML=`<a href="#forecast" class="nav-item active" aria-current="page">${icon('trend')}<span>پلنینگ میلادی</span></a><a href="#forecast" class="nav-item" onclick="document.getElementById('v2-history-result')?.scrollIntoView()">${icon('report')}<span>عملکرد شش ماه اخیر</span></a>`;
+  AggregatePlanning.render($('#main'));$('#sidebar').classList.remove('open');return;
+ }
  if (!data) return;
  page = location.hash.slice(1) || 'dashboard';
  if (!pages.some(p => p[0] === page)) page = 'dashboard';
@@ -257,6 +266,7 @@ function render() {
  if (page === 'dashboard' && data.performance.length) updateDashboardPrediction();
 }
 async function load() {
+ if (globalThis.AggregatePlanning) { render(); return; }
  try {
   data = await api(`/api/state?demo=${demo ? 1 : 0}`);
   if (!location.hash && !data.runs.length) location.hash = 'import';
