@@ -255,6 +255,19 @@ footer { color: #788d78; }
 #v2-result .tabs-line { flex-wrap: wrap; }
 #v2-result td { font-variant-numeric: tabular-nums; }
 @media(max-width:620px) { .v2-scope fieldset { margin: 15px; padding: 10px; } .v2-checks { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; } .v2-checks label { font-size: 10px; padding: 9px 6px; } }
+.v2-backtest { margin-top: 24px; border-color: #ccd9ba; scroll-margin-top: 20px; overflow: hidden; }
+.v2-backtest > .notice, .bt-notes .notice { margin: 18px 20px; line-height: 2.2; }
+.bt-months { margin: 0 20px 20px; padding: 14px; border: 1px solid #e0e9da; border-radius: 10px; }
+.bt-months legend { padding: 0 8px; color: #52714c; font-size: 11px; }
+.v2-backtest .table-scroll { max-height: 500px; margin-top: 17px; }
+.v2-backtest .tabs-line { flex-wrap: wrap; }
+.backtest-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 15px; padding: 17px 20px; background: #f6f9ef; color: #617953; font-size: 11px; }
+.backtest-summary b { font-size: 15px; color: #365d37; padding: 0 5px; }
+.bt-notes { margin: 20px; padding: 13px; border: 1px solid #e5ebdb; border-radius: 8px; color: #6c815e; }
+.bt-notes summary { cursor: pointer; }
+.v2-backtest td { font-variant-numeric: tabular-nums; }
+.v2-backtest th { position: sticky; top: 0; z-index: 1; background: #f4f8ee; }
+@media(max-width:620px) { .bt-months { margin: 0 14px 16px; } .backtest-summary { gap: 12px; } .backtest-summary .btn { width: 100%; } .v2-backtest .tabs-line { padding: 0 10px; } .v2-backtest .tabs-line button { font-size: 10px; padding: 12px 8px; } }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; scroll-behavior: auto !important; }
   .planning-step:hover { transform: none; }

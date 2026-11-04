@@ -1,0 +1,83 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const vm=require('node:vm');
+const {fixture}=require('./test_v2.cjs');
+const store=new Map();
+const context=vm.createContext({Intl,Date,console,localStorage:{getItem:k=>store.get(k)||null,setItem:(k,v)=>store.set(k,v)}});
+vm.runInContext(fs.readFileSync('backtest.js','utf8'),context);
+vm.runInContext(fs.readFileSync('planning-v2.js','utf8'),context);
+const P=context.AggregatePlanning,B=context.PlanningBacktest;
+const clone=x=>JSON.parse(JSON.stringify(x));
+const ds=P.validate(fixture(),{cutoff:'2026-11-01',confirmed:true});
+const selection={sectors:['Commercial'],verticals:['FASHION','H&B'],payments:['Installment','Finance'],months:['2027-02'],budget:10000};
+const before=JSON.stringify(ds),result=B.run(ds,selection,['2026-08','2026-09','2026-10'],1);
+assert.equal(JSON.stringify(ds),before,'backtest must not mutate actual data');
+assert.equal(result.folds.length,3);assert.equal(result.skipped.length,0);
+assert.equal(result.monthly.length,18);
+assert(result.summary.every(r=>r.observations===3));
+assert(result.monthly.every(r=>r.origin_exclusive===r.target+'-01'));
+assert(result.cohorts.some(r=>r.target==='2026-08'&&r.cohort_month==='2026-08'),'new entrants must be evaluated, not just old cohorts');
+for(const target of ['2026-08','2026-09','2026-10']){
+ const snap=B.snapshot(ds,target);
+ const manual=P.forecast(snap,{...selection,months:[target],budget:null}).results[0];
+ for(const row of result.monthly.filter(r=>r.target===target))assert.equal(row.predicted,manual[row.metric],'backtest must use the production forecast pipeline');
+ const orders=result.monthly.find(r=>r.target===target&&r.metric==='orders');
+ assert.equal(orders.actual,ds.mix.filter(r=>r.sector==='Commercial'&&r.activity_month===target).reduce((s,r)=>s+r.orders,0));
+ assert.equal(orders.error,orders.predicted-orders.actual);
+ assert(Math.abs(orders.error_pct-100*orders.error/orders.actual)<1e-9);
+}
+const changed=clone(ds);
+for(const r of changed.activity)if(r.activity_month>='2026-08'){r.orders*=8;r.gross_gmv_toman*=50;r.voucher_spend_toman*=30;}
+for(const r of changed.mix)if(r.activity_month>='2026-08'){r.orders*=8;r.gross_gmv_toman*=50;r.voucher_spend_toman*=30;}
+for(const r of changed.sizes)if(r.cohort_month!=='PRE_HISTORY'&&r.cohort_month>='2026-08')r.cohort_size*=100;
+changed.coverage.forEach(r=>r.available_in_forecast_month=0);
+const mutated=B.run(changed,{...selection,budget:1e18},['2026-08']);
+assert.equal(mutated.folds.length,1);
+assert.deepEqual(clone(mutated.monthly.map(r=>r.predicted)),clone(result.monthly.filter(r=>r.target==='2026-08').map(r=>r.predicted)),'future actuals, cohort sizes, present-day availability and budget cannot affect historical predictions');
+assert.notEqual(mutated.monthly.find(r=>r.metric==='orders').actual,result.monthly.find(r=>r.target==='2026-08'&&r.metric==='orders').actual);
+const snap=B.snapshot(ds,'2026-08');
+assert(snap.activity.every(r=>r.activity_month<'2026-08'));
+assert(snap.sizes.every(r=>r.cohort_month==='PRE_HISTORY'||r.cohort_month<'2026-08'));
+assert.equal(snap.coverage.length,0);
+assert(snap.calendar.every(r=>r.campaign_days===null&&r.committed_voucher_budget_toman===null));
+const confirmed=clone(ds);confirmed.coverage=[
+ {sector:'Commercial',payment_method:'Finance',available_in_forecast_month:0,forecast_month:'2026-08',known_at_cutoff:'2026-07-20'},
+ {sector:'Commercial',payment_method:'Installment',available_in_forecast_month:0,known_at_cutoff:'2026-08-01'},
+];
+assert.equal(B.snapshot(confirmed,'2026-08').coverage.length,1);
+const horizon=B.run(ds,selection,['2026-10'],3);
+assert.equal(horizon.folds.length,1);assert.equal(horizon.folds[0].origin_exclusive,'2026-08-01');
+const manual3=P.forecast(B.snapshot(ds,'2026-08'),{...selection,months:['2026-10'],budget:null}).results[0];
+assert.equal(horizon.monthly.find(r=>r.metric==='orders').predicted,manual3.orders);
+assert(horizon.cohorts.some(r=>r.cohort_month==='2026-09'&&r.predicted!==null));
+const subset=B.run(ds,{...selection,verticals:['H&B'],payments:['Finance']},['2026-10']);
+assert(subset.cells.every(r=>r.vertical==='H&B'&&r.payment_method==='Finance'));
+assert(subset.monthly.find(r=>r.metric==='excluded_orders').actual>0);
+const missing=B.run(ds,selection,['2025-12','2026-11'],1);
+assert.equal(missing.folds.length,0);assert.equal(missing.skipped.length,2);assert.equal(missing.summary.length,0);
+assert.throws(()=>B.run(ds,selection,[],1));assert.throws(()=>B.run(ds,selection,['2026-10'],0));assert.throws(()=>B.run(ds,selection,['2026-10'],25));
+const unmatched=clone(ds);
+unmatched.mix=unmatched.mix.filter(r=>!(r.sector==='Commercial'&&r.activity_month==='2026-10'&&r.cohort_month==='2025-11'&&r.user_type==='Organic'&&r.vertical==='FASHION'));
+const absent=B.run(unmatched,selection,['2026-10']);
+assert(absent.cells.some(r=>r.status==='prediction_only'&&r.actual===null&&r.error===null),'absent cells must not be fabricated as zero');
+const novel=clone(ds);
+novel.mix.push({...novel.mix.find(r=>r.sector==='Commercial'&&r.activity_month==='2026-10'),vertical:'NEW',orders:10,gross_gmv_toman:10000});
+const newCell=B.run(novel,{...selection,verticals:[...selection.verticals,'NEW']},['2026-10']);
+assert(newCell.cells.some(r=>r.status==='actual_only'&&r.predicted===null));
+const zero=B.summarize([{metric:'orders',actual:0,predicted:5,error:5,absolute_error:5,status:'comparable'}]);
+assert.equal(zero[0].mae,5);assert.equal(zero[0].wape_pct,null);assert.equal(zero[0].bias_pct,null);
+const aggregate=B.summarize([{metric:'orders',actual:10,predicted:20,error:10,absolute_error:10,status:'comparable'},{metric:'orders',actual:90,predicted:80,error:-10,absolute_error:10,status:'comparable'}]);
+assert.equal(aggregate[0].wape_pct,20);assert.equal(aggregate[0].bias_pct,0);assert.equal(aggregate[0].mae,10);
+const weighted=B.summarize([{metric:'aov_toman',actual:100,predicted:200,error:100,absolute_error:100,evaluation_weight:1,status:'comparable'},{metric:'aov_toman',actual:100,predicted:100,error:0,absolute_error:0,evaluation_weight:9,status:'comparable'}]);assert.equal(weighted[0].mae,10);assert.equal(weighted[0].wape_pct,10);
+assert.throws(()=>B.run(ds,{...selection,sectors:[]},['2026-10']));
+const nodes=new Map(),root={innerHTML:'',querySelectorAll:()=>[],querySelector:s=>{if(!nodes.has(s))nodes.set(s,{});return nodes.get(s);}};
+P.render(root);
+assert(root.innerHTML.includes('id="backtest"'));assert(root.innerHTML.includes('اجرای بک تست'));assert(root.innerHTML.includes('data-bt-month')===false);
+const datasetKey='planning-aggregate-gregorian-v2';store.set(datasetKey,JSON.stringify(ds));
+vm.runInContext(fs.readFileSync('planning-v2.js','utf8'),context);
+context.AggregatePlanning.render(root);
+assert.equal((root.innerHTML.match(/data-bt-month=/g)||[]).length,12);
+nodes.get('#bt-run').onclick();
+assert(root.innerHTML.includes('خلاصهٔ خطاهای شاخص‌های ماهانه'));assert(root.innerHTML.includes('دانلود گزارش کامل JSON'));assert(root.innerHTML.includes('وضعیت')||root.innerHTML.includes('status'));
+assert(!root.innerHTML.includes('NaN')&&!root.innerHTML.includes('undefined'));
+console.log('Backtest checks passed: production forecast parity, nested historical fitting, new entrants, multi-step recursion, leakage prevention, all planning metrics, sparse cells, zero denominators, skipped folds and UI states.');

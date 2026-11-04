@@ -105,8 +105,10 @@ print(json.dumps({'payload':{'files':files},'summary':{'target':r['target'],'war
  assert(html.includes('src="./local-engine.js"'));
  assert(html.includes('src="./forecast-reports.js"'));
  assert(html.includes('src="./planning-v2.js"'));
+ assert(html.includes('src="./backtest.js"'));
+ assert(html.indexOf('src="./backtest.js"') < html.indexOf('src="./planning-v2.js"'));
  assert(html.indexOf('src="./planning-v2.js"') < html.indexOf('src="./app.js"'));
  assert(!/(?:src|href)="\/(?:app.js|styles.css)/.test(html));
- for (const file of ['app.js','styles.css','local-engine.js','forecast-reports.js','planning-v2.js','extraction-contract.json']) assert.equal(fs.readFileSync('docs/'+file,'utf8'),fs.readFileSync(file,'utf8'));
+ for (const file of ['app.js','styles.css','local-engine.js','forecast-reports.js','planning-v2.js','backtest.js','extraction-contract.json']) assert.equal(fs.readFileSync('docs/'+file,'utf8'),fs.readFileSync(file,'utf8'));
  console.log('Pages tests passed: Python/JavaScript parity, persistence, imports, locked snapshots, quota failures, mode isolation and subpath assets.');
 })().catch(e => { console.error(e); process.exitCode=1; });

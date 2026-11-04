@@ -93,6 +93,9 @@ for (const renderer of ['dashboard', 'scenarioPage', 'cohortPage', 'voucherPage'
  await run('load()');
  assert(aggregateRendered,'new aggregate workflow must start without contacting the legacy backend');
  assert(nodes.get('#navigation').innerHTML.includes('پلنینگ میلادی'));
+ assert(nodes.get('#navigation').innerHTML.includes('بک تست'));
+ context.location.hash='#backtest';run('render()');
+ assert(nodes.get('#navigation').innerHTML.includes('href="#backtest" class="nav-item active"'));
  console.log('API response checks passed: empty, HTML, truncated JSON, invalid structure, backend errors and static local routing.');
 })().catch(error=>{console.error(error);process.exitCode=1;});
 console.log('Frontend checks passed: all 8 pages, empty states, Persian periods, CSV parsing, HTML escaping and safe exports.');

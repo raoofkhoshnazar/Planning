@@ -27,6 +27,8 @@ function fixture(){
  }
  return files;
 }
+module.exports={fixture};
+if(require.main===module){
 const raw=fixture(),meta={cutoff:'2026-11-01',confirmed:true},ds=P.validate(raw,meta);
 assert.equal(ds.meta.calendar,'gregorian');assert.equal(ds.sizes.length,72);
 assert.throws(()=>P.month('1405-08'));
@@ -83,3 +85,4 @@ assert(contract.queries['01_cohort_sizes.csv'].includes('GROUP BY sector, cohort
 assert(contract.queries['03_cohort_mix.csv'].includes('A.sector, A.activity_month'));
 assert.equal(P.parse('a,b\n"x,y",2')[0].a,'x,y');
 console.log('Aggregate planning v2 passed: eight-file validation, privacy, Gregorian-only input, checkbox UI, three sectors, backtests, recursive horizons, filtered six-month history and extraction SQL contracts.');
+}

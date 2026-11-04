@@ -251,8 +251,8 @@ function navigate(target) { location.hash = target; if (page === target) render(
 function render() {
  if (globalThis.AggregatePlanning) {
   $('#breadcrumb-title').textContent='پلنینگ میلادی و تحلیل شش‌ماهه';
-  $('#navigation').innerHTML=`<a href="#forecast" class="nav-item active" aria-current="page">${icon('trend')}<span>پلنینگ میلادی</span></a><a href="#forecast" class="nav-item" onclick="document.getElementById('v2-history-result')?.scrollIntoView()">${icon('report')}<span>عملکرد شش ماه اخیر</span></a>`;
-  AggregatePlanning.render($('#main'));$('#sidebar').classList.remove('open');return;
+  $('#navigation').innerHTML=`<a href="#forecast" class="nav-item ${location.hash==='#backtest'?'':'active'}">${icon('trend')}<span>پلنینگ میلادی</span></a><a href="#forecast" class="nav-item" onclick="document.getElementById('v2-history-result')?.scrollIntoView()">${icon('report')}<span>عملکرد شش ماه اخیر</span></a><a href="#backtest" class="nav-item ${location.hash==='#backtest'?'active':''}">${icon('deviation')}<span>بک تست</span></a>`;
+  AggregatePlanning.render($('#main'));$('#sidebar').classList.remove('open');if(location.hash==='#backtest')$('#backtest')?.scrollIntoView?.({block:'start'});return;
  }
  if (!data) return;
  page = location.hash.slice(1) || 'dashboard';
@@ -411,6 +411,6 @@ document.addEventListener('click', async e => {
  }
  if (action === 'forecast-details' && lastForecast) openModal(`<h2>جزئیات و منبع محاسبات</h2><p>ماه هدف ${monthName(lastForecast.target)} · فقط داده‌های پیش از ماه هدف در محاسبه وارد شده‌اند.</p><div class="table-scroll"><table><thead><tr><th>سگمنت</th><th>روش</th><th>روند جدید</th><th>مبنای شمسی</th><th>شناسه منبع</th></tr></thead><tbody>${lastForecast.rows.map(r => `<tr><td>${esc(vname(r.vertical))}<br>${esc(r.payment_method)}</td><td>${r.method === 'cohort' ? 'کوهورت' : 'تقریب تجمیعی'}</td><td>${pct(r.trend_pct)}</td><td>${r.baseline_months.map(monthName).join('<br>')}</td><td class="mono">${r.source_run_ids.map(esc).join('<br>')}</td></tr>`).join('')}</tbody></table></div><p>کاربران جدید = مبنای کاربران جدید × (۱ + روند تاریخی) × (۱ + فرض رشد) × ضریب کمپین. سفارش = کاربر فعال × دفعات سفارش. GMV = سفارش × AOV.</p>`);
 });
-window.addEventListener('hashchange', () => { render(); window.scrollTo({ top: 0 }); });
+window.addEventListener('hashchange', () => { render(); if(location.hash!=='#backtest')window.scrollTo({ top: 0 }); });
 $('#main').innerHTML = '<div class="loading">در حال آماده‌سازی فضای برنامه‌ریزی…</div>';
 load();
