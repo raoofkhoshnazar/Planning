@@ -268,6 +268,17 @@ footer { color: #788d78; }
 .v2-backtest td { font-variant-numeric: tabular-nums; }
 .v2-backtest th { position: sticky; top: 0; z-index: 1; background: #f4f8ee; }
 @media(max-width:620px) { .bt-months { margin: 0 14px 16px; } .backtest-summary { gap: 12px; } .backtest-summary .btn { width: 100%; } .v2-backtest .tabs-line { padding: 0 10px; } .v2-backtest .tabs-line button { font-size: 10px; padding: 12px 8px; } }
+.scenario-assumptions { margin: 18px 20px; border: 1px solid #dce7d1; border-radius: 12px; background: #fcfdf9; }
+.scenario-assumptions > h3 { padding: 10px 20px 0; color: #47633b; font-size: 14px; }
+.scenario-assumptions > .notice { margin: 15px; line-height: 2.1; }
+.scenario-cards { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; padding: 0 15px 15px; }
+.scenario-cards details { padding: 15px; border: 1px solid #e0e8d7; border-radius: 9px; background: #f2f7eb; }
+.scenario-cards summary { cursor: pointer; color: #496d3e; font-weight: 650; }
+.scenario-cards p { color: #77876a; font-size: 10px; line-height: 2; overflow-wrap: anywhere; }
+.scenario-cards b { color: #48673d; }
+#scenario-result-select { min-width: 160px; }
+@media(max-width:900px) { .scenario-cards { grid-template-columns: 1fr; } }
+@media(max-width:620px) { .scenario-assumptions { margin: 15px 10px; } .scenario-assumptions .form-grid { padding: 15px; } }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; scroll-behavior: auto !important; }
   .planning-step:hover { transform: none; }

@@ -1,4 +1,5 @@
 import json
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -96,6 +97,20 @@ class ClickHouseQueryTests(unittest.TestCase):
         self.assertEqual(quality['duplicate_order_id_excess_rows'], 0)
         self.assertEqual(quality['conflicting_venture_mappings'], 0)
         self.assertEqual(quality['rows_without_unique_mapping'], 0)
+
+    def test_query_exports_are_accepted_by_the_app(self):
+        kinds = ['sizes', 'activity', 'mix', 'control', 'voucher', 'calendar', 'coverage', 'quality']
+        payload = {'json': {kind: self.execute(name) for kind, name in zip(kinds, self.queries)}, 'csv': {kind: str(self.db.query(sql, 'CSVWithNames')) for kind, sql in zip(kinds, self.queries.values())}}
+        script = '''const fs=require('fs'),vm=require('vm');
+const ctx=vm.createContext({Intl,Date,localStorage:{getItem:()=>null}});
+for(const f of ['input-contract.js','scenarios.js','planning-v2.js'])vm.runInContext(fs.readFileSync(f,'utf8'),ctx);
+const payload=JSON.parse(fs.readFileSync(0,'utf8'));
+for(const rows of [payload.json,Object.fromEntries(Object.entries(payload.csv).map(([k,text])=>[k,ctx.AggregatePlanning.parse(text)]))]){
+ const imported=ctx.AggregatePlanning.validate(rows,{cutoff:'2026-11-01',confirmed:true});
+ if(imported.activity.length!==rows.activity.length)throw Error('Import row mismatch');
+}
+console.log('All eight actual ClickHouse JSON/CSV exports were accepted by the app.');'''
+        subprocess.run(['node', '-e', script], input=json.dumps(payload), text=True, cwd=ROOT, check=True, capture_output=True)
 
     def test_alias_and_nullable_join_settings(self):
         try:
