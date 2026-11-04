@@ -96,7 +96,12 @@ print(json.dumps({'payload':{'files':files},'summary':{'target':r['target'],'war
   close(predicted,actual.forecast);
   console.log(`Uploaded CSVs verified: ${preview.files.map(f=>f.count).join('/')} accepted rows, ${preview.rejected.length} quarantined, target ${preview.target}, ${predicted.rows.length} forecast segments.`);
  }
+ const config = JSON.parse(fs.readFileSync('wrangler.jsonc','utf8'));
+ assert.equal(config.name,'planning');
+ assert.equal(config.assets.directory,'./docs');
+ assert.equal(config.main,undefined);
  const html = fs.readFileSync('docs/index.html','utf8');
+ assert(html.indexOf('src="./local-engine.js"') < html.indexOf('src="./app.js"'));
  assert(html.includes('src="./local-engine.js"'));
  assert(html.includes('src="./forecast-reports.js"'));
  assert(!/(?:src|href)="\/(?:app.js|styles.css)/.test(html));

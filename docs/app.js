@@ -51,7 +51,14 @@ let currentAssumptions = { ...defaultAssumptions }, scenarioTarget = '';
 async function api(path, payload) {
  if (globalThis.planningLocalAPI) return globalThis.planningLocalAPI(path, payload);
  const response = await fetch(path, payload ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) } : {});
- const result = await response.json();
+ const text = await response.text();
+ if (!text.trim() || !(response.headers.get('Content-Type') || '').toLowerCase().includes('application/json')) {
+  throw new Error('سرویس داده پاسخ JSON معتبر ندارد. برای میزبانی بدون سرور روی Cloudflare باید پوشهٔ docs منتشر شود؛ نسخهٔ ریشه به بک‌اند Python نیاز دارد.');
+ }
+ let result;
+ try { result = JSON.parse(text); }
+ catch { throw new Error('پاسخ سرویس داده ناقص یا نامعتبر است؛ تنظیمات انتشار و وضعیت بک‌اند را بررسی کنید.'); }
+ if (!result || typeof result !== 'object' || Array.isArray(result)) throw new Error('ساختار پاسخ سرویس داده معتبر نیست.');
  if (!response.ok) throw new Error(result.error || 'دریافت اطلاعات ممکن نشد.');
  return result;
 }

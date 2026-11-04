@@ -71,4 +71,23 @@ for (const renderer of ['dashboard', 'scenarioPage', 'cohortPage', 'voucherPage'
  const html = run(`${renderer}()`);
  assert(!html.includes('NaN') && !html.includes('undefined'), `empty ${renderer} renders invalid values`);
 }
+(async () => {
+ const response = (text, type='application/json', ok=true) => ({ok,headers:{get:()=>type},text:async()=>text});
+ for (const [text,type] of [['',''],['<html>Not an API</html>','text/html']]) {
+  context.fetch=async()=>response(text,type);
+  await assert.rejects(run("api('/api/state?demo=1')"),/docs/);
+ }
+ context.fetch=async()=>response('{');
+ await assert.rejects(run("api('/api/state')"),/ناقص/);
+ context.fetch=async()=>response('null');
+ await assert.rejects(run("api('/api/state')"),/ساختار/);
+ context.fetch=async()=>response('{"error":"backend unavailable"}','application/json',false);
+ await assert.rejects(run("api('/api/state')"),/backend unavailable/);
+ context.fetch=async()=>response('{"performance":[]}');
+ assert.equal((await run("api('/api/state')")).performance.length,0);
+ context.planningLocalAPI=async()=>({local:true});
+ context.fetch=()=>{throw Error('Static deployment must not request a Python API');};
+ assert.equal((await run("api('/api/state')")).local,true);
+ console.log('API response checks passed: empty, HTML, truncated JSON, invalid structure, backend errors and static local routing.');
+})().catch(error=>{console.error(error);process.exitCode=1;});
 console.log('Frontend checks passed: all 8 pages, empty states, Persian periods, CSV parsing, HTML escaping and safe exports.');
