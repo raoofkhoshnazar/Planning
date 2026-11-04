@@ -25,6 +25,28 @@ month_lookup AS
     FROM calendar
 ),
 ''' + common[b:]
+a = common.index('commercial_map AS')
+b = common.index('all_settled AS')
+common = common[:a] + '''commercial_map_variants AS
+(
+    SELECT DISTINCT
+        toUInt64(CD.venture_id) AS mapped_venture_id,
+        upper(trimBoth(toString(CD.vertical))) AS mapped_vertical,
+        toString(CD.category) AS mapped_category
+    FROM minio_db.commercial_data AS CD
+),
+commercial_map AS
+(
+    SELECT
+        mapped_venture_id AS venture_id,
+        min(mapped_vertical) AS vertical,
+        min(mapped_category) AS category,
+        1 AS mapping_found
+    FROM commercial_map_variants
+    GROUP BY mapped_venture_id
+    HAVING count() = 1
+),
+''' + common[b:]
 common = common.replace('D.vertical AS vertical,', "D.vertical AS vertical,\n        multiIf(S.merchant_type = 'ONLINE','Commercial',S.merchant_type IN ('IN_STORE','IN_STORE_QR'),'InStore','Social') AS sector,")
 common = common.replace("WHERE S.merchant_type = 'ONLINE'\n      AND D.vertical != 'SNAPP-VENTURE'\n      AND D.category NOT IN ('in_store', 'social', 'ventures')", "WHERE S.merchant_type IN ('ONLINE','IN_STORE','IN_STORE_QR','SOCIAL')\n      AND (S.merchant_type != 'ONLINE' OR (D.vertical != 'SNAPP-VENTURE' AND D.category NOT IN ('in_store','social','ventures')))")
 common = common.replace('        wallet_id,\n        argMin(order_date', '        wallet_id,\n        sector,\n        argMin(order_date')
@@ -33,6 +55,14 @@ common = common.replace('        wallet_id,\n        first_commercial_date,', ' 
 common = common.replace('        O.vertical,\n        O.payment_method,', '        O.vertical,\n        O.sector,\n        O.payment_method,')
 common = common.replace('ON O.wallet_id = C.wallet_id', 'ON O.wallet_id = C.wallet_id AND O.sector = C.sector')
 common = common.replace('PRE_1401', 'PRE_HISTORY')
+settled_fields = ['order_id', 'wallet_id', 'order_at', 'order_date', 'venture_id', 'merchant_type', 'payment_method_raw', 'amount_raw', 'voucher_discount_raw', 'voucher_is_null']
+commercial_fields = settled_fields + ['vertical', 'sector', 'payment_method', 'order_voucher_status']
+member_fields = ['wallet_id', 'sector', 'first_commercial_date', 'first_commercial_order_id', 'first_commercial_voucher']
+for prefix, fields in [('S', settled_fields), ('F', member_fields), ('O', commercial_fields)]:
+    common = common.replace(f'        {prefix}.*,', ',\n'.join(f'        {prefix}.{field} AS {field}' for field in fields) + ',')
+for prefix, fields in [('O', ['order_id', 'wallet_id', 'vertical', 'sector', 'payment_method', 'order_voucher_status', 'amount_raw', 'voucher_discount_raw', 'voucher_is_null']), ('C', ['cohort_month', 'cohort_month_index', 'user_type', 'first_commercial_order_id', 'first_commercial_voucher'])]:
+    for field in fields:
+        common = common.replace(f'        {prefix}.{field},', f'        {prefix}.{field} AS {field},')
 queries = {}
 names = ['01_cohort_sizes','02_cohort_activity','03_cohort_mix','04_monthly_control','05_voucher_monthly','06_business_calendar','07_payment_coverage','08_data_quality']
 for i, (name, select) in enumerate(zip(names, blocks[1:])):
@@ -45,10 +75,17 @@ for i, (name, select) in enumerate(zip(names, blocks[1:])):
         select = select.replace('SELECT\n    O.payment_method,', 'SELECT\n    O.sector,\n    O.payment_method,').replace('GROUP BY O.payment_method', 'GROUP BY O.sector, O.payment_method')
     elif i == 7:
         select = select.replace("'online_settled'", "'eligible_settled'").replace("WHERE S.merchant_type = 'ONLINE'", "WHERE S.merchant_type IN ('ONLINE','IN_STORE','IN_STORE_QR','SOCIAL')")
-        select = select.replace('ORDER BY scope, metric;', "UNION ALL\nSELECT 'all_settled', 'null_order_id_rows', toUInt64(countIf(isNull(order_id))) FROM all_settled\n\nORDER BY scope, metric;")
+        select = select.replace('ORDER BY scope, metric;', "UNION ALL\nSELECT 'all_settled', 'null_order_id_rows', toUInt64(countIf(isNull(order_id))) FROM all_settled")
+        select = 'SELECT Q.scope AS scope, Q.metric AS metric, Q.value AS value\nFROM\n(\n' + select.rstrip().rstrip(';') + '\n) AS Q\nORDER BY Q.scope, Q.metric;'
     queries[name+'.csv'] = common + '\n' + select
 contract = {
-    'version': 2, 'calendar': 'Gregorian only; YYYY-MM and first-of-month YYYY-MM-01',
+    'version': 2, 'sql_revision': 2,
+    'sql_fixes': [
+        'Normalize and deduplicate mapping variants before aggregation; prevent aggregate aliases from expanding inside HAVING.',
+        'Use explicit aliases instead of joined CTE star projections to keep stable wallet and cohort column names.',
+        'Sort the outer UNION ALL result for data-quality controls, not the final UNION branch.',
+    ],
+    'calendar': 'Gregorian only; YYYY-MM and first-of-month YYYY-MM-01',
     'scope': 'Commercial=ONLINE; InStore=IN_STORE/IN_STORE_QR; Social=SOCIAL. Cohort is first eligible successful order within each sector, not first vertical/payment entry. Cross-sector unique users cannot be summed.',
     'user_type': 'Voucher on first global SETTLE order across sectors, fixed forever; Unknown is retained.',
     'instructions': [
