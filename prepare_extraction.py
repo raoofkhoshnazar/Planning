@@ -77,7 +77,7 @@ for i, (name, select) in enumerate(zip(names, blocks[1:])):
         select = select.replace("'online_settled'", "'eligible_settled'").replace("WHERE S.merchant_type = 'ONLINE'", "WHERE S.merchant_type IN ('ONLINE','IN_STORE','IN_STORE_QR','SOCIAL')")
         select = select.replace('ORDER BY scope, metric;', "UNION ALL\nSELECT 'all_settled', 'null_order_id_rows', toUInt64(countIf(isNull(order_id))) FROM all_settled")
         select = 'SELECT Q.scope AS scope, Q.metric AS metric, Q.value AS value\nFROM\n(\n' + select.rstrip().rstrip(';') + '\n) AS Q\nORDER BY Q.scope, Q.metric;'
-    queries[name+'.csv'] = common + '\n' + select
+    queries[name+'.csv'] = '\n'.join(line for line in (common + '\n' + select).splitlines() if line.strip())
 contract = {
     'version': 2, 'sql_revision': 2,
     'sql_fixes': [

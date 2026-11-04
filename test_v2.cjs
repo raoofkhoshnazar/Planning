@@ -80,7 +80,7 @@ const items=new Map(),root={innerHTML:'',querySelectorAll:()=>[],querySelector:s
 P.render(root);assert.equal((root.innerHTML.match(/data-file=/g)||[]).length,8);assert(root.innerHTML.includes('2027-12'));assert(root.innerHTML.includes('InStore'));assert(root.innerHTML.includes('PostPaid'));assert(!root.innerHTML.includes('۱۴۰۵'));
 const contract=JSON.parse(fs.readFileSync('extraction-contract.json','utf8'));
 assert.equal(Object.keys(contract.queries).length,8);
-for(const query of Object.values(contract.queries)){assert(!query.includes('year_anchors'));assert(!query.includes('PRE_1401'));assert(query.includes('PRE_HISTORY'));}
+for(const query of Object.values(contract.queries)){assert(query.split('\n').every(line=>line.trim().length>0),'SQL files must not contain empty or whitespace-only lines');assert(!query.includes('year_anchors'));assert(!query.includes('PRE_1401'));assert(query.includes('PRE_HISTORY'));}
 assert(contract.queries['01_cohort_sizes.csv'].includes('GROUP BY sector, cohort_month'));
 assert(contract.queries['03_cohort_mix.csv'].includes('A.sector, A.activity_month'));
 assert.equal(P.parse('a,b\n"x,y",2')[0].a,'x,y');
